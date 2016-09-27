@@ -1,0 +1,60 @@
+#!/usr/bin/env node
+
+var debug = require('debug')('webhook-migrate:cli');
+var fs = require('fs');
+var extend = require('xtend');
+
+// utilities
+var mapArgumentsToOptions = require('../map-arguments-to-options.js');
+var requiredOptions = require('../required-options.js');
+var help = require('../cli-help.js');
+
+var whConfPath = '.firebase.conf';
+var whConfRequiredKeys = ['secretKey', 'siteName'];
+var firebaseConf = getConf(whConfPath, whConfRequiredKeys);
+
+var optionsFromArguments = mapArgumentsToOptions(process.argv);
+
+var options = requiredOptions(extend(firebaseConf, optionsFromArguments), help);
+
+debug(options);
+
+require('../')(options);
+
+function getUserHome() {
+  return process.env[
+      (process.platform == 'win32') ?
+        'USERPROFILE' : 'HOME'
+    ];
+}
+
+function getConf (path, requiredKeys) {
+  try {
+    var conf = JSON.parse(
+      fs.readFileSync(path)
+        .toString());
+  } catch (e) {
+    console.log(
+      'Requires a configuration file at ', path);
+    return undefined;
+  }
+
+  var requiredKeysNotFound = requiredKeys
+    .filter(function ensureRequired (key) {
+      // they key is not in the conf
+      return !(key in conf);
+    });
+
+  if (requiredKeysNotFound.length > 0) {
+    requiredKeysNotFound
+      .forEach(function (key) {
+        console.log(
+          'Configuration at path: ' + path + '\n',
+          'requires a value for key: ', key);
+      });
+    return undefined;
+  }
+  else {
+    return conf;
+  }
+}

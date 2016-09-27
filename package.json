@@ -1,0 +1,22 @@
+{
+  "name": "webhook-migrate",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "wh-migrate": "bin/cli"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cheerio": "^0.22.0",
+    "debug": "^2.2.0",
+    "minimist": "^1.2.0",
+    "mississippi": "^1.2.0",
+    "request": "^2.75.0",
+    "xtend": "^4.0.1"
+  }
+}
