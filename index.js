@@ -127,9 +127,9 @@ function Migrate (opts) {
           $(el).find('img').attr('data-resize-src', htmlResponseItem.responseBody.resize_url);
           // preserve the resize attribute
           var imgSrc = $(el).find('img').attr('src').split('=s');
-          var newSrc = htmlResponseItem.responseBody.url;
+          var newSrc = htmlResponseItem.responseBody.resize_url;
           if (imgSrc.length === 2) {
-            newSrc = [htmlResponseItem.responseBody.url, imgSrc[1]].join('=s');
+            newSrc = [htmlResponseItem.responseBody.resize_url, imgSrc[1]].join('=s');
           }
           $(el).find('img').attr('src', newSrc);
         }
