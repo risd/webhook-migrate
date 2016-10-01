@@ -9,6 +9,10 @@
   "bin": {
     "wh-migrate": "bin/cli"
   },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/risd/webhook-migrate.git"
+  },
   "author": "",
   "license": "ISC",
   "dependencies": {
