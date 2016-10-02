@@ -42,12 +42,6 @@ function Migrate (opts) {
   
   var backup = readJson(options.pathToRead);
 
-  // debug(valueForKeypath(backup, ['data', 'pages', '-KS9_3tAZ1HUdH7tXn8z', 'grid', 0, 'gallery', 0], {}))
-  // debug(valueForKeypath(backup, ['data', 'pages', '-KS9_3tAZ1HUdH7tXn8z', 'grid', 0, 'gallery', 0]))
-  // debug(valueForKeyPath(backup, ['data', 'pages', '-KS9_3tAZ1HUdH7tXn8z', 'grid', 0, 'gallery', 0], {}))
-  // debug(valueForKeyPath(backup, ['data', 'pages', '-KS9_3tAZ1HUdH7tXn8z', 'grid', 0, 'gallery', 0]))
-  // return;
-
   var imageDataToMigrate = imagePlucker(controlPlucker('image'))
     .concat(imagePlucker(controlPlucker('file')))
     .concat(imagePlucker(controlPlucker('audio')))
@@ -126,10 +120,15 @@ function Migrate (opts) {
           $(el).find('a').attr('href', htmlResponseItem.responseBody.url);
           $(el).find('img').attr('data-resize-src', htmlResponseItem.responseBody.resize_url);
           // preserve the resize attribute
-          var imgSrc = $(el).find('img').attr('src').split('=s');
+          var imgSrc = $(el).find('img').attr('src');
+          if (!imgSrc) {
+            console.error('Empty image source: ', htmlResponseItem.key);
+            return;
+          }
+          var imgSrcSplit = imgSrc.split('=s')
           var newSrc = htmlResponseItem.responseBody.resize_url;
-          if (imgSrc.length === 2) {
-            newSrc = [htmlResponseItem.responseBody.resize_url, imgSrc[1]].join('=s');
+          if (imgSrcSplit.length === 2) {
+            newSrc = [htmlResponseItem.responseBody.resize_url, imgSrcSplit[1]].join('=s');
           }
           $(el).find('img').attr('src', newSrc);
         }
@@ -153,7 +152,7 @@ function Migrate (opts) {
       })
   }
 
-  // [{ controlType, contentType, oneOff, key<[<String>,]> }]
+  // [{ controlType, contentType, oneOff, key<[<String>,]> }] =>
   //   [{ image: { resize_url, url }, key: [<String>] }]
   function imagePlucker (pluckedControls) {
     return dataItems()
@@ -515,11 +514,11 @@ function Migrate (opts) {
   // ({ ..., request })
   function uploader (requestItem, enc, next) {
     uploadUrl(requestItem.requestBody, function (err, response) {
-      next(null, extend(requestItem, { responseBody: response }));
+      next(null, err ? {} : extend(requestItem, { responseBody: response }));
     });
   }
 
-  // ({ form: { url, resize_url, toekn, site }, function next (err, body) }) =>
+  // ({ form: { url, resize_url, token, site }, function next (err, body) }) =>
   //   undefined
   function uploadUrl (body, next) {
     request.post(
@@ -527,7 +526,8 @@ function Migrate (opts) {
       body,
       function (err, httpResponse, body) {
         if (err) {
-          debug(err);
+          console.error("Error uploading file: " + body.form.url);
+          console.error(err);
           return next(err, {});
         }
         else {
