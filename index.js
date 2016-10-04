@@ -503,7 +503,7 @@ function Migrate (opts) {
       .forEach(function (requestItem) {
         process.nextTick(function () {
           input.push(requestItem);
-        })
+        });
       });
 
     miss.pipe(input, upload, output, function (err) {
@@ -514,6 +514,7 @@ function Migrate (opts) {
   // ({ ..., request })
   function uploader (requestItem, enc, next) {
     uploadUrl(requestItem.requestBody, function (err, response) {
+      if (err) console.error(JSON.stringify(requestItem));
       next(null, err ? {} : extend(requestItem, { responseBody: response }));
     });
   }
@@ -526,8 +527,6 @@ function Migrate (opts) {
       body,
       function (err, httpResponse, body) {
         if (err) {
-          console.error("Error uploading file: " + body.form.url);
-          console.error(err);
           return next(err, {});
         }
         else {
