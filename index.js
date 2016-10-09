@@ -530,7 +530,8 @@ function Migrate (opts) {
         .forEach(function (requestItem) {
           // the item has already been successfully processed
           // so we don't need to push it back into the stream
-          if (requestItem.hasOwnProperty('responseBody')) return;
+          if ((typeof requestItem === 'object') &&
+              (requestItem.hasOwnProperty('responseBody'))) return;
           process.nextTick(function () {
             input.push(requestItem);
           });
