@@ -42,16 +42,23 @@ function Migrate (opts) {
   
   var backup = readJson(options.pathToRead);
 
-  var imageDataToMigrate = imagePlucker(controlPlucker('image'))
-    .concat(imagePlucker(controlPlucker('file')))
-    .concat(imagePlucker(controlPlucker('audio')))
-    .concat(imagePlucker(controlPlucker('gallery')));
+  if (Array.isArray(backup)) {
+    // this is a backup of requestItems
+    var requests = backup;
+  }
+  else {
+    // this is a backup of webhook, find request items
+    var imageDataToMigrate = imagePlucker(controlPlucker('image'))
+      .concat(imagePlucker(controlPlucker('file')))
+      .concat(imagePlucker(controlPlucker('audio')))
+      .concat(imagePlucker(controlPlucker('gallery')));
 
-  var imageRequests = extendImageWithRequests(imageDataToMigrate);
+    var imageRequests = extendImageWithRequests(imageDataToMigrate);
 
-  var htmlRequests = extendHtmlWithRequests(htmlPlucker(controlPlucker('wysiwyg')));
-  
-  var requests = imageRequests.concat(htmlRequests);
+    var htmlRequests = extendHtmlWithRequests(htmlPlucker(controlPlucker('wysiwyg')));
+    
+    var requests = imageRequests.concat(htmlRequests);
+  }
 
   debug(requests.length + ' file requests to process');
 
@@ -62,10 +69,15 @@ function Migrate (opts) {
   processRequests(
     requests,
     function mapResponse (responseItems) {
-      debug(responseItems.length + ' requests processed');
 
-      var imageResponseItems = responseItems.filter(itemWithImage);
-      var htmlResponseItems = responseItems.filter(itemWithHtml);
+      var errorResponseItems = responseItems
+        .filter(itemWithKey('errorBody'));
+      var imageResponseItems = responseItems
+        .filter(itemWithKey('responseBody'))
+        .filter(itemWithKey('image'));
+      var htmlResponseItems = responseItems
+        .filter(itemWithKey('responseBody'))
+        .filter(itemWithKey('html'));
 
       // Updates `backup` object in place using the response
       mapImageResponses(imageResponseItems);
@@ -73,8 +85,12 @@ function Migrate (opts) {
 
       // Writes `backup` object
       writeJsonToPath(options.pathToWrite, backup);
+      writeJsonToPath(options.pathToWrite + '.errors', errorResponseItems);
 
+      debug(responseItems.length + ' requests processed');
+      debug(errorResponseItems.length + ' requests errored');
       debug('data written to: ' + options.pathToWrite);
+      debug('errors written to: ' + options.pathToWrite + '.errors');
     });
 
 
@@ -496,6 +512,11 @@ function Migrate (opts) {
   //   |> continuationFunction([{ ..., requestBody, responseBody }])
   function processRequests (requestItems, next, attempt) {
     if (!attempt) attempt = 0;
+    var maxAttempts = 100;
+
+    if (attempt > maxAttempts) {
+      next(requestItems);
+    }
 
     debug('processRequests:attempt:' + attempt);
 
@@ -509,9 +530,7 @@ function Migrate (opts) {
     // check for `errorBody` requests. if there are any
     // lets start the process again with the array
     var output = miss.concat(function checkIfComplete (responseItems) {
-      var erroredRequests = responseItems.filter(function (responseItem) {
-        return responseItem.hasOwnProperty('errorBody');
-      });
+      var erroredRequests = responseItems.filter(responseItemWithErrorBody);
       if (erroredRequests.length === 0) {
         // we have no errors, lets pass our response
         // into our callback
@@ -590,8 +609,12 @@ function Migrate (opts) {
 function filterObjectWithKey(key) {
   return function (obj) { return key in obj; };
 }
-function itemWithImage (item) { return 'image' in item; }
-function itemWithHtml (item) { return 'html' in item; }
+
+function itemWithKey (key) {
+  return function itemWithClosureKey (item) {
+    return item.hasOwnProperty(key);
+  }
+}
 
 // ([], []) => Boolean
 // 
