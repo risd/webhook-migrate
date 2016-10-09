@@ -497,6 +497,8 @@ function Migrate (opts) {
   function processRequests (requestItems, next, attempt) {
     if (!attempt) attempt = 0;
 
+    debug('processRequests:attempt:' + attempt);
+
     // push `requestItems` into this stream
     var input = miss.through.obj();
     // make requests based on `requestBody`
@@ -516,6 +518,7 @@ function Migrate (opts) {
         next(responseItems);
       }
       else {
+        debug('processRequests:erroredRequests:' + erroredRequests.length);
         // we have errors, lets try to reprocess thehm
         var nextAttempt = attempt + 1;
         processRequests(responseItems, next, nextAttempt);
