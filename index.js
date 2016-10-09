@@ -492,30 +492,75 @@ function Migrate (opts) {
     }).reduce(function (a, b) { return a.concat(b); }, []);
   }
 
-  // ([{ ..., request }], continuationFunction) => undefined
+  // ([{ ..., requestBody }], continuationFunction) => undefined
   //   |> continuationFunction([{ ..., requestBody, responseBody }])
-  function processRequests (requestItems, next) {
+  function processRequests (requestItems, next, attempt) {
+    if (!attempt) attempt = 0;
+
+    // push `requestItems` into this stream
     var input = miss.through.obj();
+    // make requests based on `requestBody`
+    // if successsul, extend with `responseBody`
+    // if errored, extend with `errorBody`
     var upload = miss.through.obj(uploader);
-    var output = miss.concat(next);
-
-    requestItems.concat([null])
-      .forEach(function (requestItem) {
-        process.nextTick(function () {
-          input.push(requestItem);
-        });
+    // after trying to upload all items
+    // check for `errorBody` requests. if there are any
+    // lets start the process again with the array
+    var output = miss.concat(function checkIfComplete (responseItems) {
+      var erroredRequests = responseItems.filter(function (responseItem) {
+        return responseItem.hasOwnProperty('errorBody');
       });
+      if (erroredRequests.length === 0) {
+        // we have no errors, lets pass our response
+        // into our callback
+        next(responseItems);
+      }
+      else {
+        // we have errors, lets try to reprocess thehm
+        var nextAttempt = attempt + 1;
+        processRequests(responseItems, next, nextAttempt);
+      }
+    });
 
+    setTimeout(function () {
+      requestItems.concat([null])
+        .forEach(function (requestItem) {
+          // the item has already been successfully processed
+          // so we don't need to push it back into the stream
+          if (requestItem.hasOwnProperty('responseBody')) return;
+          process.nextTick(function () {
+            input.push(requestItem);
+          });
+        });
+    }, backoffTime(attempt));
+
+    // put together the pipeline without a callback
+    // that capture errors. although none of the
+    // pieces of the stream emits errors, so we
+    // won't end up in the callback.
     miss.pipe(input, upload, output, function (err) {
       if (err) return next(err, null);
     });
   }
 
-  // ({ ..., request })
+  function backoffTime (attempt) {
+    var backoff = Math.pow(2, attempt);
+    var maxBackoffTime = 32000;
+    var randomOffset = Math.random() * 10;
+    return Math.min(backoff, maxBackoffTime) + randomOffset;
+  }
+
+  // ({ ..., requestBody })
   function uploader (requestItem, enc, next) {
     uploadUrl(requestItem.requestBody, function (err, response) {
-      if (err) console.error(JSON.stringify(requestItem));
-      next(null, err ? {} : extend(requestItem, { responseBody: response }));
+      // if this errored before, but not this time,
+      // lets remove the error
+      if (!err && requestItem.hasOwnProperty('errorBody')) {
+        delete requestItem.errorBody
+      }
+      next(null, err
+        ? extend(requestItem, { errorBody: err })
+        : extend(requestItem, { responseBody: response }));
     });
   }
 
