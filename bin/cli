@@ -16,10 +16,12 @@ var firebaseConf = getConf(whConfPath, whConfRequiredKeys);
 var optionsFromArguments = mapArgumentsToOptions(process.argv);
 
 var options = requiredOptions(extend(firebaseConf, optionsFromArguments), help);
+var backup = options.backup;
+delete options.backup;
 
 debug(options);
 
-require('../')(options);
+require('../')(backup, options);
 
 function getUserHome() {
   return process.env[

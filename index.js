@@ -1,11 +1,3 @@
-/**
- * Migrate
- * Reads a local backup of a webhook site, the same one that
- * is produced by `wh preset-data-all`.
- * Writes a copy of the local backup, with all of the files
- * re-uploaded to the new webhook instance.
- */
-
 'use strict';
 
 var debug = require('debug')('webhook-migrate');
@@ -21,8 +13,23 @@ module.exports = Migrate;
 module.exports.requiredOptions = requiredOptions;
 module.exports.mapArgumentsToOptions = require('./map-arguments-to-options.js');
 
-function Migrate (opts) {
-  if (!(this instanceof Migrate)) return new Migrate(opts);
+
+/**
+ * Migrate
+ * Copies all /webhook-uploads/ from a webhook site bucket
+ * and moves them to another.
+ * Optionally writes to a file on complete
+ *
+ * @param {object}     backup    `{ controlType: {}, data: {} }`
+ * @param {object}     opts      An object that conforms to the shape
+ *                               defined in `required-options.js`
+ * @param {function?}  callback  Optional function to call at the end of
+ *                               the migration, with the updated backup
+ *                               object
+ */
+
+function Migrate (backup, opts, callback) {
+  if (!(this instanceof Migrate)) return new Migrate(backup, opts, callback);
 
   /* Options */
   /* ----------------------------------------- */
@@ -35,19 +42,13 @@ function Migrate (opts) {
   debug(options);
 
 
-  /* Gather data */
+  /* Make requests */
   /* ----------------------------------------- */
 
-  debug('reading data from: ' + options.pathToRead);
-  
-  var backup = readJson(options.pathToRead);
-
-  if (Array.isArray(backup)) {
-    // this is a backup of requestItems
-    var requests = backup;
+  if (Array.isArray(options.requests)) {
+    var requests = options.requests;
   }
   else {
-    // this is a backup of webhook, find request items
     var imageDataToMigrate = imagePlucker(controlPlucker('image'))
       .concat(imagePlucker(controlPlucker('file')))
       .concat(imagePlucker(controlPlucker('audio')))
@@ -84,13 +85,15 @@ function Migrate (opts) {
       mapHtmlResponses(htmlResponseItems);
 
       // Writes `backup` object
-      writeJsonToPath(options.pathToWrite, backup);
-      writeJsonToPath(options.pathToWrite + '.errors', errorResponseItems);
+      writeJsonToPath(options.migrated, backup);
+      writeJsonToPath(options.migrated + '.errors', errorResponseItems);
 
       debug(responseItems.length + ' requests processed');
       debug(errorResponseItems.length + ' requests errored');
-      debug('data written to: ' + options.pathToWrite);
-      debug('errors written to: ' + options.pathToWrite + '.errors');
+      debug('data written to: ' + options.migrated);
+      debug('errors written to: ' + options.migrated + '.errors');
+
+      if (typeof callback === 'function') callback(backup);
     });
 
 
@@ -512,7 +515,7 @@ function Migrate (opts) {
   //   |> continuationFunction([{ ..., requestBody, responseBody }])
   function processRequests (requestItems, next, attempt) {
     if (!attempt) attempt = 0;
-    var maxAttempts = 100;
+    var maxAttempts = 20;
 
     if (attempt > maxAttempts) {
       next(requestItems);
@@ -530,7 +533,7 @@ function Migrate (opts) {
     // check for `errorBody` requests. if there are any
     // lets start the process again with the array
     var output = miss.concat(function checkIfComplete (responseItems) {
-      var erroredRequests = responseItems.filter(responseItemWithErrorBody);
+      var erroredRequests = responseItems.filter(itemWithKey('errorBody'));
       if (erroredRequests.length === 0) {
         // we have no errors, lets pass our response
         // into our callback
@@ -668,10 +671,6 @@ function isLastItemUsing (array) {
   return function isLastItem (arrayIndex) {
     return array.length - 1 === arrayIndex;
   }
-}
-
-function readJson (path) {
-  return JSON.parse(fs.readFileSync(path).toString());
 }
 
 function writeJsonToPath (path, data) {
