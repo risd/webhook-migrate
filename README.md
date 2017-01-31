@@ -5,14 +5,13 @@ Reads a local backup of a [webhook][webhook] site, the same one that is produced
 The whole dance looks like:
 
 ```bash
+wh create project-to-migrate-to
 cd project-to-migrate-from/
 wh preset-data-all
-cd ..
-wh create project-to-migrate-to
+mv .preset-data.json ../project-to-migrate-to/migrate-from.json
 cd project-to-migrate-to/
-wh-migrate project-to-migrate-from.webhook.org \
-  ../project-to-migrate-from/.preset-data.json \
-  .new-preset-data.json
+wh-migrate migrate-from.json restore-from.json \
+  --from=project-to-migrate-from.webhook.org
 ```
 
 This will write `.new-preset-data.json`, which will be a copy of `project-to-migrate-from/.preset-data.json`. To restore from this copy use the local webhook CMS to restore from a backup.
