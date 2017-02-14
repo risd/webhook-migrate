@@ -12,6 +12,7 @@ module.exports = mapArgumentsToOptions;
 // [] => {}
 function mapArgumentsToOptions (arguments) {
   var parsedArgs = require('minimist')(arguments.slice(2));
+
   var positionalArguments = parsedArgs._
     .map(function(arg, position) {
       if (position === 0) return { backup: readJson(arg) };
@@ -26,6 +27,9 @@ function mapArgumentsToOptions (arguments) {
 
   parsedArgs = renameProperty(parsedArgs, 'from', 'migrateFrom');
   parsedArgs = renameProperty(parsedArgs, 'url', 'uploadUrl');
+
+  debug('parsedArgs')
+  debug(parsedArgs)
 
   return extend(parsedArgs, positionalArguments,
     (typeof parsedArgs.requests === 'string'
@@ -42,9 +46,16 @@ function renameProperty (object, last, current) {
 }
 
 function readJson (path) {
-  return JSON.parse(fs.readFileSync(path).toString());
+  return JSON.parse(stripBom(fs.readFileSync(path)));
 }
 
 function writeJsonToPath (path, data) {
   fs.writeFileSync(path, JSON.stringify(data, null, 2));
+}
+
+function stripBom (content) {
+  // we do this because JSON.parse would convert it to a utf8 string if encoding wasn't specified
+  if (Buffer.isBuffer(content)) content = content.toString('utf8')
+  content = content.replace(/^\uFEFF/, '')
+  return content
 }

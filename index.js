@@ -16,8 +16,16 @@ module.exports.mapArgumentsToOptions = require('./map-arguments-to-options.js');
 
 /**
  * Migrate
+ * Requires a `backup` object in the shape of a webhook backup.
+ * The `backup` is examined for all of its uploaded files.
+ * Each file is migrated over to the new bucket. Images are
+ * passed through the webhook server, in order to generate
+ * a webhook image object (`{ resize_url, url, width, height }`).
+ * The migrated files are then put back into the original backup
+ * file. The callback is called 
  * Copies all /webhook-uploads/ from a webhook site bucket
  * and moves them to another.
+ * 
  * Optionally writes to a file on complete
  *
  * @param {object}     backup    `{ controlType: {}, data: {} }`
@@ -30,12 +38,13 @@ module.exports.mapArgumentsToOptions = require('./map-arguments-to-options.js');
 
 function Migrate (backup, opts, callback) {
   if (!(this instanceof Migrate)) return new Migrate(backup, opts, callback);
+  if (typeof callback !== 'function') callback = function noop () {}
 
   /* Options */
   /* ----------------------------------------- */
 
   var options = requiredOptions(opts, function failure (missingKey) {
-      throw new Error('Missing option: ' + missingKey)
+      callback(new Error('Missing option: ' + missingKey))
     });
   
   debug('options');
@@ -93,7 +102,11 @@ function Migrate (backup, opts, callback) {
       debug('data written to: ' + options.migrated);
       debug('errors written to: ' + options.migrated + '.errors');
 
-      if (typeof callback === 'function') callback(backup);
+      var errorResponse = errorResponseItems.length === 0
+        ? null
+        : errorResponseItems;
+
+      callback(errorResponse, backup);
     });
 
 
