@@ -531,7 +531,7 @@ function Migrate (backup, opts, callback) {
     var maxAttempts = 20;
 
     if (attempt > maxAttempts) {
-      next(requestItems);
+      return next(requestItems);
     }
 
     debug('processRequests:attempt:' + attempt);
@@ -614,7 +614,11 @@ function Migrate (backup, opts, callback) {
           return next(err, {});
         }
         else {
-          body = JSON.parse(body);
+          try {
+            body = JSON.parse(body);  
+          } catch ( error ) {
+            return next(body, {})
+          }
           next(null, body);
           // body = { resize_url, mimeType, size, url }
         }
