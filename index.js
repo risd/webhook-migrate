@@ -72,7 +72,6 @@ function Migrate (backup, opts, callback) {
 
   debug(requests.length + ' file requests to process');
 
-
   /* Process data */
   /* ----------------------------------------- */
   
@@ -469,9 +468,11 @@ function Migrate (backup, opts, callback) {
     // { url, resize_url } => 
     function prependMigrateFromToUrl (urlData) {
       return extend(urlData, {
-        url: (options.migrateFrom.indexOf('http') === 0
-          ? options.migrateFrom
-          : 'http://' + options.migrateFrom) + urlData.url
+        url: (urlData.url.startsWith('http')
+          ? ''
+          : (options.migrateFrom.indexOf('http') === 0
+              ? options.migrateFrom
+              : 'http://' + options.migrateFrom) ) + urlData.url
       })
     }
   }
@@ -508,9 +509,11 @@ function Migrate (backup, opts, callback) {
       var requests = [];
       var $ = cheerio.load(htmlItem.html);
       $('figure[data-type="image"]').each(function (i, el) {
+        var url = $(el).find('a').attr('href')
+        if (typeof url !== 'string') return;
         requests = requests.concat([{
           form: formData({
-            url: $(el).find('a').attr('href'),
+            url: url,
             resize_url: true,
           })
         }])
@@ -619,6 +622,7 @@ function Migrate (backup, opts, callback) {
           } catch ( error ) {
             return next(body, {})
           }
+          
           next(null, body);
           // body = { resize_url, mimeType, size, url }
         }
