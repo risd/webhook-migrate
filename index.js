@@ -146,12 +146,12 @@ function Migrate (backup, opts, callback) {
 
       // replace image 
       var $ = cheerio.load(html);
-      $('figure[data-type="image"]').each(function (i, el) {
+      $('img[data-resize-src]').each(function (i, el) {
         if (i === imageIndex) {
-          $(el).find('a').attr('href', htmlResponseItem.responseBody.url);
-          $(el).find('img').attr('data-resize-src', htmlResponseItem.responseBody.resize_url);
+          $(el).parent('a').attr('href', htmlResponseItem.responseBody.url);
+          $(el).attr('data-resize-src', htmlResponseItem.responseBody.resize_url);
           // preserve the resize attribute
-          var imgSrc = $(el).find('img').attr('src');
+          var imgSrc = $(el).attr('src');
           if (!imgSrc) {
             console.error('Empty image source: ', htmlResponseItem.key);
             return;
@@ -161,7 +161,7 @@ function Migrate (backup, opts, callback) {
           if (imgSrcSplit.length === 2) {
             newSrc = [htmlResponseItem.responseBody.resize_url, imgSrcSplit[1]].join('=s');
           }
-          $(el).find('img').attr('src', newSrc);
+          $(el).attr('src', newSrc);
         }
       })
 
@@ -303,10 +303,11 @@ function Migrate (backup, opts, callback) {
                   else return a.concat([b]);
                 }, []);
             })
-            .reduce(function (a, b) { return a.concat(b) }, []);
+            .reduce(function (a, b) { return Array.isArray(b[0]) ? a.concat(b) : a.concat([b]) }, []);
         }
       })
-      .reduce(function (a, b) { return a.concat(b) }, []);
+      .reduce(function (a, b) { return Array.isArray(b[0]) ? a.concat(b) : a.concat([b]) }, [])
+      .reduce(function (a, b) { return Array.isArray(b[0]) ? a.concat(b) : a.concat([b]) }, []);
   }
 
   // (contentType<String>, controlKey<String>) => boolean
@@ -508,8 +509,8 @@ function Migrate (backup, opts, callback) {
     return htmlItems.map(function toRequestData (htmlItem) {
       var requests = [];
       var $ = cheerio.load(htmlItem.html);
-      $('figure[data-type="image"]').each(function (i, el) {
-        var url = $(el).find('a').attr('href')
+      $('img[data-resize-src]').each(function (i, el) {
+        var url = $(el).parent('a').attr('href')
         if (typeof url !== 'string') return;
         requests = requests.concat([{
           form: formData({
